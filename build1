@@ -1,0 +1,189 @@
+
+#!/usr/bin/env python3
+"""Dependency-free Cyberpunk 2077 build and weapon helper.
+
+Recommendations are organized by playstyle and are intended as a planning aid.
+Weapon performance and availability can change between game patches and DLC.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Weapon:
+    name: str
+    category: str
+    build_tags: tuple[str, ...]
+    reason: str
+
+
+@dataclass(frozen=True)
+class Build:
+    name: str
+    description: str
+    tags: tuple[str, ...]
+    attributes: tuple[str, ...]
+    skills: tuple[str, ...]
+    perks: tuple[str, ...]
+    cyberware: tuple[str, ...]
+    weapons: tuple[str, ...]
+    difficulty: str
+
+
+WEAPONS = (
+    Weapon("Overture", "revolver", ("gunslinger", "stealth", "headshots"), "Excellent burst damage for precision headshots."),
+    Weapon("Her Majesty", "pistol", ("stealth", "gunslinger"), "Silenced iconic pistol with strong stealth synergy."),
+    Weapon("Lizzie", "pistol", ("netrunner", "gunslinger", "tech"), "Charged bursts pair well with Tech weapons perks."),
+    Weapon("Skippy", "smart pistol", ("smart", "beginner"), "A flexible early smart-weapon option with a unique personality."),
+    Weapon("Yinglong", "smart SMG", ("smart", "netrunner"), "Smart projectiles and electrical effects complement Intelligence builds."),
+    Weapon("Pizdets", "smart SMG", ("smart", "stealth"), "Accurate smart fire is useful for controlled ranged encounters."),
+    Weapon("Guts", "shotgun", ("solo", "body", "aggressive"), "High-risk close-range damage with a powerful kick."),
+    Weapon("Rostovic DB-2 Satara", "tech shotgun", ("tech", "solo", "body"), "Charged blasts reward Tech weapon investment."),
+    Weapon("Hercules 3ax", "heavy weapon", ("body", "solo", "aggressive"), "Strong sustained fire for a durable frontline build."),
+    Weapon("Mantis Blades", "cyberware", ("reflexes", "stealth", "aggressive"), "Fast melee cyberware with mobility and finisher synergy."),
+    Weapon("Byakko", "katana", ("reflexes", "blades"), "Very strong aggressive katana option for fast melee combat."),
+    Weapon("Errata", "thermal katana", ("reflexes", "blades", "aggressive"), "Fire-focused blade that rewards pressure and close combat."),
+    Weapon("Gwynbleidd", "sword", ("reflexes", "blades", "aggressive"), "Reliable melee weapon for sustained blade combat."),
+    Weapon("Satori", "katana", ("reflexes", "blades", "headshots"), "A high-crit katana choice for an agile precision build."),
+    Weapon("Malorian Arms 3516", "pistol", ("gunslinger", "aggressive"), "Iconic pistol with strong precision damage and style."),
+)
+
+
+BUILDS = (
+    Build(
+        "Stealth Netrunner",
+        "Disable enemies through quickhacks, remain unseen, and finish priority targets quietly.",
+        ("netrunner", "hacking", "stealth", "ranged", "intelligence"),
+        ("Intelligence", "Cool", "Technical Ability", "Body"),
+        ("Quickhacking", "Overclock", "Smart Weapons"),
+        ("Optimization", "Embedded Exploit", "Queue", "Eye in the Sky", "Shinobi movement basics"),
+        ("cyberdeck with high RAM", "RAM recovery cyberware", "optical camo", "adrenaline converter"),
+        ("Yinglong", "Pizdets", "Her Majesty", "Lizzie"),
+        "Medium",
+    ),
+    Build(
+        "Reflex Blade Ninja",
+        "A mobile melee build built around blades, dashes, deflects, and stealth takedowns.",
+        ("reflexes", "blades", "ninja", "stealth", "melee"),
+        ("Reflexes", "Cool", "Technical Ability", "Body"),
+        ("Blades", "Dash", "Air Dash", "Finisher: Act of Mercy"),
+        ("Lead and Steel", "Flash and Thunderclap", "Slaughterhouse", "Shinobi", "Run 'N' Gun"),
+        ("Mantis Blades", "sandevistan or berserk", "reinforced tendons", "optical camo"),
+        ("Byakko", "Errata", "Gwynbleidd", "Satori", "Mantis Blades"),
+        "Medium",
+    ),
+    Build(
+        "Smart-Gun Solo",
+        "A durable frontline shooter using smart weapons, heavy fire, and cyberware-powered survivability.",
+        ("solo", "smart", "aggressive", "body", "ranged"),
+        ("Body", "Technical Ability", "Intelligence", "Reflexes"),
+        ("Guns", "Adrenaline Rush", "Smart Weapons", "Body perks"),
+        ("Die! Die! Die!", "Bullet Ballet", "Onslaught", "Edgerunner", "Borrowed Time"),
+        ("subdermal armor", "biomonitor", "blood pump", "skeleton capacity cyberware"),
+        ("Hercules 3ax", "Guts", "Yinglong", "Skippy"),
+        "Low",
+    ),
+    Build(
+        "Tech Weapon Demolitionist",
+        "Charge tech weapons, deploy explosive cyberware, and solve encounters with overwhelming area damage.",
+        ("tech", "explosives", "ranged", "aggressive", "engineering"),
+        ("Technical Ability", "Body", "Reflexes", "Cool"),
+        ("Bolt", "Pyromania", "Health Item perks", "Grenades"),
+        ("All Things Cyber", "License to Chrome", "Bolt", "Chain Lightning", "Pyromania"),
+        ("projectile launch system", "thermal or shock weapon mods", "reinforced tendons", "chrome compressor"),
+        ("Rostovic DB-2 Satara", "Lizzie", "Guts", "Malorian Arms 3516"),
+        "Medium",
+    ),
+    Build(
+        "Cool Gunslinger",
+        "Precision pistols and revolvers with stealth openings, critical headshots, and quickdraw finishers.",
+        ("gunslinger", "pistol", "revolver", "stealth", "headshots", "cool"),
+        ("Cool", "Reflexes", "Technical Ability", "Body"),
+        ("Focus", "Deadeye", "Pistols and Revolvers", "Dash"),
+        ("Focus", "Deep Breath", "High Noon", "Run 'N' Gun", "Scorpion Sting"),
+        ("Kiroshi optics", "subdermal armor", "optical camo", "neofiber"),
+        ("Her Majesty", "Overture", "Malorian Arms 3516", "Lizzie"),
+        "Medium",
+    ),
+)
+
+
+def normalize(value: str) -> str:
+    return value.strip().lower()
+
+
+def score_build(build: Build, preferences: set[str]) -> int:
+    return sum(3 if preference in build.tags else 0 for preference in preferences)
+
+
+def recommend_builds(preferences: set[str], limit: int = 3) -> list[Build]:
+    ranked = sorted(BUILDS, key=lambda build: score_build(build, preferences), reverse=True)
+    return ranked[:limit]
+
+
+def find_weapons(category: str | None = None, preferences: set[str] | None = None) -> list[Weapon]:
+    category = normalize(category) if category else None
+    preferences = preferences or set()
+    matches = [
+        weapon for weapon in WEAPONS
+        if (not category or category in weapon.category.lower())
+        and (not preferences or any(tag in weapon.build_tags for tag in preferences))
+    ]
+    return matches
+
+
+def print_build(build: Build) -> None:
+    print(f"\n{build.name} [{build.difficulty} difficulty]")
+    print(f"  {build.description}")
+    print(f"  Attributes: {', '.join(build.attributes)}")
+    print(f"  Skills: {', '.join(build.skills)}")
+    print(f"  Perks: {', '.join(build.perks)}")
+    print(f"  Cyberware: {', '.join(build.cyberware)}")
+    print(f"  Weapons: {', '.join(build.weapons)}")
+
+
+def print_weapons(weapons: list[Weapon]) -> None:
+    if not weapons:
+        print("No matching weapons found. Try a broader category or different tags.")
+        return
+    print("\nRecommended weapons")
+    for weapon in weapons:
+        print(f"  {weapon.name} ({weapon.category}) - {weapon.reason}")
+
+
+def interactive() -> None:
+    print("Cyberpunk 2077 Build Helper")
+    print("Try tags such as netrunner, stealth, blades, solo, smart, tech, or gunslinger.")
+    preferences = {normalize(value) for value in input("Playstyle preferences (comma-separated): ").split(",") if normalize(value)}
+    print("\nBuild recommendations")
+    for build in recommend_builds(preferences):
+        print_build(build)
+    print_weapons(find_weapons(preferences=preferences))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Recommend Cyberpunk 2077 builds and weapons.")
+    parser.add_argument("--preferences", help="Comma-separated tags, such as stealth,blades or solo,smart")
+    parser.add_argument("--weapon-category", help="Filter weapons by category, such as pistol, shotgun, or katana")
+    parser.add_argument("--all-builds", action="store_true", help="Show every build archetype")
+    parser.add_argument("--weapons-only", action="store_true", help="Only show weapon recommendations")
+    args = parser.parse_args()
+
+    if not args.preferences and not args.weapon_category and not args.all_builds and not args.weapons_only:
+        interactive()
+        return
+
+    preferences = {normalize(value) for value in (args.preferences or "").split(",") if normalize(value)}
+    if not args.weapons_only:
+        print("Build recommendations")
+        builds = BUILDS if args.all_builds else recommend_builds(preferences)
+        for build in builds:
+            print_build(build)
+    print_weapons(find_weapons(args.weapon_category, preferences))
+
+
+if __name__ == "__main__":
+    main()
